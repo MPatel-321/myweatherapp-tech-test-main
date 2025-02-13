@@ -87,7 +87,11 @@ public class WeatherControllerTest {
 		    String result = mvcResult.getResponse().getContentAsString();
 		    
 		    assertFalse(result.isEmpty());
-		    assertTrue(result.contains("longer daylight duration than") || result.contains("same daylight duration"));
+		    assertTrue(result.contains("'" + cityName1 + "' has a longer daylight duration than '" + cityName2 + "'") 
+		    		|| result.contains("'" + cityName2 + "' has a longer daylight duration than '" + cityName1 + "'")
+		    		|| result.contains("Both '" + cityName1 + "' and '" + cityName2 + "' have the same daylight duration")
+		    		|| result.contains("Both '" + cityName2 + "' and '" + cityName1 + "' have the same daylight duration")
+		    );
 		}
 		
 		@ParameterizedTest
@@ -119,8 +123,8 @@ public class WeatherControllerTest {
 		    String result = mvcResult.getResponse().getContentAsString();
 		    
 		    assertFalse(result.isEmpty());
-		    assertFalse(result.contains("longer daylight duration than"));
-		    assertTrue(result.contains("same daylight duration"));
+		    assertFalse(result.contains("'" + cityName + "' has a longer daylight duration than '" + cityName + "'"));
+		    assertTrue(result.contains("Both '" + cityName + "' and '" + cityName + "' have the same daylight duration"));
 		}
 		
 		@ParameterizedTest
