@@ -2,16 +2,21 @@ package com.weatherapp.myweatherapp.controller;
 
 import java.time.Duration;
 import java.time.LocalTime;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.weatherapp.myweatherapp.exception.ExceptionResponse;
 import com.weatherapp.myweatherapp.model.CityInfo;
 import com.weatherapp.myweatherapp.service.WeatherService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.client.HttpClientErrorException;
 
 @Controller
 public class WeatherController {
@@ -20,9 +25,13 @@ public class WeatherController {
   WeatherService weatherService;
 
   @GetMapping("/forecast/{city}")
-  public ResponseEntity<CityInfo> forecastByCity(@PathVariable("city") String city) {
+  public ResponseEntity<CityInfo> forecastByCity(@PathVariable("city") String city) throws HttpClientErrorException {
 
     CityInfo ci = weatherService.forecastByCity(city);
+    
+    if(ci == null) {
+    	throw new HttpClientErrorException(HttpStatus.BAD_REQUEST);
+    }
 
     return ResponseEntity.ok(ci);
   }
@@ -37,7 +46,7 @@ public class WeatherController {
   }
   
   // Calculates the daylight duration of a particular city (Note: city daylight duration = city sunset time - city sunrise time)
-  private Duration calculateCityDaylightDuration(String city) {
+  private Duration calculateCityDaylightDuration(String city) throws HttpClientErrorException {
 	  ResponseEntity<CityInfo> cityInfoResponseEntity = forecastByCity(city);
 	  JsonNode cityInfoJsonNode = new ObjectMapper().valueToTree(cityInfoResponseEntity.getBody());
 	  
@@ -49,25 +58,32 @@ public class WeatherController {
   
   // Takes two city names and determines which of the two corresponding cities has the longer daylight duration (Note: city daylight duration = city sunset time - city sunrise time)
   @GetMapping("/daylightHoursComparison/{city1}/{city2}")
-  public ResponseEntity<String> daylightHoursComparison(@PathVariable("city1") String city1, @PathVariable("city2") String city2) {
-	  Duration city1DaylightDuration = calculateCityDaylightDuration(city1);
-	  Duration city2DaylightDuration = calculateCityDaylightDuration(city2);
-	  
-	  int city1AndCity2DaylightDurationComparison = city1DaylightDuration.compareTo(city2DaylightDuration);
-	  
-	  String outputText = "<b>Result:</b><br/>";
-	  if(city1AndCity2DaylightDurationComparison > 0) {
-		  outputText += "'" + city1 + "' has a longer daylight duration than '" + city2 + "'.";
+  public ResponseEntity<?> daylightHoursComparison(@PathVariable("city1") String city1, @PathVariable("city2") String city2) {
+	  try {
+		  Duration city1DaylightDuration = calculateCityDaylightDuration(city1);
+		  Duration city2DaylightDuration = calculateCityDaylightDuration(city2);
+		  
+		  int city1AndCity2DaylightDurationComparison = city1DaylightDuration.compareTo(city2DaylightDuration);
+		  
+		  String outputText = "<b>Result:</b><br/>";
+		  if(city1AndCity2DaylightDurationComparison > 0) {
+			  outputText += "'" + city1 + "' has a longer daylight duration than '" + city2 + "'.";
+		  }
+		  else if(city1AndCity2DaylightDurationComparison == 0) {
+			  outputText += "Both '" + city1 + "' and '" + city2 + "' have the same daylight duration.";
+		  }
+		  else {
+			  outputText += "'" + city2 + "' has a longer daylight duration than '" + city1 + "'.";
+		  }
+		  
+		  outputText += "<br/><br/><b>Reason:</b><br/>Daylight duration in '" + city1 + "': " + String.valueOf(city1DaylightDuration.toHoursPart()) + " Hours, " + String.valueOf(city1DaylightDuration.toMinutesPart()) + " Minutes, " + String.valueOf(city1DaylightDuration.toSecondsPart()) + " Seconds.<br/>Daylight duration in '" + city2 + "': " + String.valueOf(city2DaylightDuration.toHoursPart()) + " Hours, " + String.valueOf(city2DaylightDuration.toMinutesPart()) + " Minutes, " + String.valueOf(city2DaylightDuration.toSecondsPart()) + " Seconds.";
+		  return ResponseEntity.ok(outputText);
 	  }
-	  else if(city1AndCity2DaylightDurationComparison == 0) {
-		  outputText += "Both '" + city1 + "' and '" + city2 + "' have the same daylight duration.";
+	  catch(HttpClientErrorException ex) {
+		  HttpStatus httpStatus = HttpStatus.BAD_REQUEST;
+		  ExceptionResponse exceptionResponse = new ExceptionResponse(ex.getMessage(), "Invalid City Name Provided!", httpStatus, LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss a")) + " (UK Time)");
+		  return new ResponseEntity<>(exceptionResponse, httpStatus);
 	  }
-	  else {
-		  outputText += "'" + city2 + "' has a longer daylight duration than '" + city1 + "'.";
-	  }
-	  
-	  outputText += "<br/><br/><b>Reason:</b><br/>Daylight duration in '" + city1 + "': " + String.valueOf(city1DaylightDuration.toHoursPart()) + " Hours, " + String.valueOf(city1DaylightDuration.toMinutesPart()) + " Minutes, " + String.valueOf(city1DaylightDuration.toSecondsPart()) + " Seconds.<br/>Daylight duration in '" + city2 + "': " + String.valueOf(city2DaylightDuration.toHoursPart()) + " Hours, " + String.valueOf(city2DaylightDuration.toMinutesPart()) + " Minutes, " + String.valueOf(city2DaylightDuration.toSecondsPart()) + " Seconds.";
-	  return ResponseEntity.ok(outputText);
   }
   
   // TODO: given two city names, check which city its currently raining in
