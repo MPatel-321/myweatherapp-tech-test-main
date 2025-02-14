@@ -98,12 +98,15 @@ public class WeatherControllerTest {
 		
 		@ParameterizedTest
 		@CsvSource({"sdfsfsdf,Berlin", "Paris,sdfsfsdf", "sdfsfsdf,sdfsfsdf"})
-		@DisplayName("Should Throw ServletException If At Least One Invalid Non-Empty City Name Provided")
-		void shouldThrowServletExceptionIfAtLeastOneInvalidNonEmptyCityNameProvided(String cityName1, String cityName2) throws Exception {
-			assertThrows(ServletException.class, () -> {
-				final MockHttpServletRequestBuilder builder = MockMvcRequestBuilders.get("/rainCheck/" + cityName1 + "/" + cityName2);
-				mockMvc.perform(builder);
-			});
+		@DisplayName("Should Catch ServletException If At Least One Invalid Non-Empty City Name Provided")
+		void shouldCatchServletExceptionIfAtLeastOneInvalidNonEmptyCityNameProvided(String cityName1, String cityName2) throws Exception {
+			final MockHttpServletRequestBuilder builder = MockMvcRequestBuilders.get("/rainCheck/" + cityName1 + "/" + cityName2);
+			ResultActions resultActions = mockMvc.perform(builder).andExpect(MockMvcResultMatchers.status().is4xxClientError());
+			MvcResult mvcResult = resultActions.andReturn();
+		    String result = mvcResult.getResponse().getContentAsString();
+		    
+		    assertFalse(result.isEmpty());
+		    assertTrue(result.contains("Invalid City Name Provided!"));
 		}
 		
 		@ParameterizedTest
